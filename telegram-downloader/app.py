@@ -21,11 +21,14 @@ from utils import Utils
 from logger_config import logger, get_last_error_log
 from print_handler import PartialPrinter
 from data_handler import FileDataHandler
+from ban_handler import BanHandler
 from downloadPathManager import DownloadPathManager
 from command_handler import CommandHandler
 from url_downloader import URLDownloader
 from pending_handler import PendingMessagesHandler
 from info_handler import InfoMessages
+
+ban_handler = BanHandler()
 
 #uvloop.install()
 
@@ -101,6 +104,11 @@ def message2file(message: Message) -> str:
 @app.on_message(filters.document | filters.photo | filters.video | filters.audio | filters.animation)
 async def handle_files(client: Client, message: Message):
     try:
+        sender_id = message.from_user.id if message.from_user else None
+        if sender_id and ban_handler.is_banned(sender_id):
+            logger.info(f"Blocked banned user {sender_id} (file message)")
+            return
+
         pendingMessagesHandler.add_pending_message(message.id, message)
         
         attempt = 0
@@ -299,6 +307,11 @@ async def download(client: Client, message: Message):
 @app.on_message(filters.command(command_handler.command_keys))
 async def handle_commands(client: Client, message: Message):
     logger.info(f"handle_commands : {message}")
+    sender_id = message.from_user.id if message.from_user else None
+    command = message.command[0] if message.command else ""
+    if sender_id and ban_handler.is_banned(sender_id) and command not in ("start",):
+        logger.info(f"Blocked banned user {sender_id} (command: {command})")
+        return
     message2file(message)
     await command_handler.process_command(client, message)
 
@@ -306,6 +319,10 @@ async def handle_commands(client: Client, message: Message):
 @app.on_message(filters.text)
 async def handle_text_messages(client, message: Message):
     logger.info(f"handle_text_messages : {message}")
+    sender_id = message.from_user.id if message.from_user else None
+    if sender_id and ban_handler.is_banned(sender_id):
+        logger.info(f"Blocked banned user {sender_id} (text message)")
+        return
     # Regex to detect URLs in a message
     URL_REGEX = re.compile(r'https?://\S+')
     async with semaphore:

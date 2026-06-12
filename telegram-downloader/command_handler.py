@@ -8,6 +8,7 @@ from env import Env
 from command_controller import CommandController
 from command_help import CommandHelp
 from data_handler import FileDataHandler
+from ban_handler import BanHandler
 from logger_config import logger
 
 class CommandHandler:
@@ -36,6 +37,9 @@ class CommandHandler:
             "delrenamegroup": self.addRenameGroup,
             "broadcast": self.handle_broadcast,
             "users": self.handle_users,
+            "ban": self.handle_ban,
+            "unban": self.handle_unban,
+            "banned": self.handle_banned_list,
         }
 
         self.command_keys = list(self.command_dict.keys())
@@ -192,6 +196,113 @@ class CommandHandler:
             f"❌ فشل: **{failed}**\n"
             f"👥 الإجمالي: **{len(unique_ids)}**"
         )
+
+    async def handle_ban(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        target_id = None
+        reason = ""
+
+        # Priority: reply to a message → extract sender; else parse argument
+        if message.reply_to_message and message.reply_to_message.from_user:
+            target_id = message.reply_to_message.from_user.id
+            args = message.command[1:]
+            reason = " ".join(args)
+        elif len(message.command) > 1:
+            try:
+                target_id = int(message.command[1])
+                reason = " ".join(message.command[2:])
+            except ValueError:
+                await message.reply_text("⚠️ يرجى تحديد معرّف رقمي صحيح.\n مثال: `/ban 123456789 سبب الحظر`")
+                return
+        else:
+            await message.reply_text(
+                "📢 **طريقة الاستخدام:**\n\n"
+                "• رد على رسالة المستخدم واكتب `/ban <السبب>`\n"
+                "• أو: `/ban <معرّف المستخدم> <السبب>`"
+            )
+            return
+
+        if str(target_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ لا يمكنك حظر المسؤول.")
+            return
+
+        bh = BanHandler()
+        if bh.ban(target_id, reason):
+            reason_line = f"\n📝 **السبب:** {reason}" if reason else ""
+            await message.reply_text(f"🚫 تم حظر المستخدم `{target_id}` بنجاح.{reason_line}")
+            logger.info(f"User {target_id} banned by {user_id}. Reason: {reason}")
+        else:
+            await message.reply_text(f"⚠️ المستخدم `{target_id}` محظور مسبقاً.")
+
+    async def handle_unban(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        target_id = None
+
+        if message.reply_to_message and message.reply_to_message.from_user:
+            target_id = message.reply_to_message.from_user.id
+        elif len(message.command) > 1:
+            try:
+                target_id = int(message.command[1])
+            except ValueError:
+                await message.reply_text("⚠️ يرجى تحديد معرّف رقمي صحيح.\n مثال: `/unban 123456789`")
+                return
+        else:
+            await message.reply_text(
+                "📢 **طريقة الاستخدام:**\n\n"
+                "• رد على رسالة المستخدم واكتب `/unban`\n"
+                "• أو: `/unban <معرّف المستخدم>`"
+            )
+            return
+
+        bh = BanHandler()
+        if bh.unban(target_id):
+            await message.reply_text(f"✅ تم رفع الحظر عن المستخدم `{target_id}` بنجاح.")
+            logger.info(f"User {target_id} unbanned by {user_id}.")
+        else:
+            await message.reply_text(f"⚠️ المستخدم `{target_id}` غير محظور.")
+
+    async def handle_banned_list(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        bh = BanHandler()
+        banned = bh.all_banned()
+
+        if not banned:
+            await message.reply_text("✅ لا يوجد أي مستخدم محظور حالياً.")
+            return
+
+        lines = [f"🚫 **قائمة المحظورين** ({len(banned)})\n{'─' * 28}"]
+        for rank, (uid, info) in enumerate(banned.items(), 1):
+            date = info.get("banned_at", "")[:16]
+            reason = info.get("reason", "")
+            reason_part = f" | 📝 {reason}" if reason else ""
+            lines.append(f"{rank}. `{uid}` — 🕐 {date}{reason_part}")
+
+        text = "\n".join(lines)
+        # Chunk if needed
+        chunks, current = [], ""
+        for line in text.split("\n"):
+            if len(current) + len(line) + 1 > 4096:
+                chunks.append(current)
+                current = line + "\n"
+            else:
+                current += line + "\n"
+        if current:
+            chunks.append(current)
+
+        for chunk in chunks:
+            await client.send_message(message.chat.id, chunk)
 
     async def handle_users(self, client: Client, message: Message):
         user_id = message.from_user.id if message.from_user else None
