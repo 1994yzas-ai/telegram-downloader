@@ -43,6 +43,7 @@ class CommandHandler:
             "banned": self.handle_banned_list,
             "delete": self.handle_delete,
             "pending": self.handle_pending,
+            "purge": self.handle_purge,
         }
 
         self.command_keys = list(self.command_dict.keys())
@@ -306,6 +307,39 @@ class CommandHandler:
 
         for chunk in chunks:
             await client.send_message(message.chat.id, chunk)
+
+    async def handle_purge(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        db = FileDataHandler()
+        total_before = len(db.downloads)
+
+        if total_before == 0:
+            await message.reply_text("✅ قاعدة البيانات فارغة بالفعل، لا شيء للحذف.")
+            return
+
+        # Confirm step: require /purge confirm to actually wipe
+        args = message.command[1:]
+        if not args or args[0].lower() != "confirm":
+            await message.reply_text(
+                f"⚠️ **تحذير — هذا الإجراء لا يمكن التراجع عنه!**\n\n"
+                f"سيتم حذف **{total_before}** سجل من قاعدة بيانات التحميلات.\n\n"
+                f"للتأكيد اكتب:\n`/purge confirm`"
+            )
+            return
+
+        db.downloads = []
+        db.save_to_json()
+
+        await message.reply_text(
+            f"🗑️ **تمت العملية بنجاح**\n\n"
+            f"✅ تم حذف **{total_before}** سجل من قاعدة البيانات.\n"
+            f"قاعدة البيانات الآن فارغة."
+        )
+        logger.info(f"Database purged by user {user_id}: {total_before} records deleted.")
 
     async def handle_pending(self, client: Client, message: Message):
         user_id = message.from_user.id if message.from_user else None
