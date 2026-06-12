@@ -9,6 +9,7 @@ from command_controller import CommandController
 from command_help import CommandHelp
 from data_handler import FileDataHandler
 from ban_handler import BanHandler
+from pending_handler import PendingMessagesHandler
 from logger_config import logger
 
 class CommandHandler:
@@ -41,6 +42,7 @@ class CommandHandler:
             "unban": self.handle_unban,
             "banned": self.handle_banned_list,
             "delete": self.handle_delete,
+            "pending": self.handle_pending,
         }
 
         self.command_keys = list(self.command_dict.keys())
@@ -304,6 +306,38 @@ class CommandHandler:
 
         for chunk in chunks:
             await client.send_message(message.chat.id, chunk)
+
+    async def handle_pending(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        ph = PendingMessagesHandler()
+        pending = ph.get_pending_messages()
+
+        if not pending:
+            await message.reply_text("✅ لا توجد ملفات قيد التحميل حالياً.")
+            return
+
+        count = len(pending)
+        lines = [f"⏳ **الملفات قيد التحميل** ({count})\n{'─' * 28}"]
+
+        for rank, (msg_id, info) in enumerate(pending.items(), 1):
+            raw = info.get("message", "")
+            # Extract file_name from the stringified message if present
+            file_name = "—"
+            for part in raw.split(","):
+                part = part.strip()
+                if "file_name=" in part:
+                    file_name = part.split("file_name=")[-1].strip().strip("'\")")
+                    break
+                if "file_unique_id=" in part or "mime_type=" in part:
+                    file_name = f"msg_id:{msg_id}"
+            lines.append(f"{rank}. 🆔 `{msg_id}` — 📄 {file_name}")
+
+        text = "\n".join(lines)
+        await message.reply_text(text)
 
     async def handle_delete(self, client: Client, message: Message):
         user_id = message.from_user.id if message.from_user else None
