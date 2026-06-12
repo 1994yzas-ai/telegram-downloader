@@ -2,10 +2,12 @@ download/*
 __pycache__/
 .env*
 *.json
+!railway.json
 *.session
 *copy*
 *.session-journal
 *.txt
+!requirements.txt
 docker_*
 compose.dev
 tmp/*
