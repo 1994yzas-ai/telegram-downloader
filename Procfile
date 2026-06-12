@@ -1,1 +1,1 @@
-worker: cd telegram-downloader && python app.py
+worker: cd telegram-downloader/telegram-downloader && python app.py
