@@ -98,7 +98,7 @@ class CommandHandler:
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("قناة الدعم ⚙️", url="https://t.me/shaheen_ys"),
-                InlineKeyboardButton("هدية يومية 🎁", url="https://t.me/fi1_oo"),
+                InlineKeyboardButton("هدية يومية 🎁", url="https://t.me/shaheen_mall_ys"),
             ],
             [
                 InlineKeyboardButton("📊 الإحصائيات", callback_data="cmd_stats"),
