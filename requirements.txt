@@ -3,3 +3,8 @@ tgcrypto
 python-dotenv
 yt-dlp
 aiohttp
+aiohttp
+pyrogram
+python-dotenv
+tgcrypto
+yt-dlp
