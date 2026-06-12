@@ -1,6 +1,6 @@
 
 from pyrogram import Client, filters, __version__ as pyrogram_version
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram import enums
 
 from env import Env
@@ -15,7 +15,7 @@ class CommandHandler:
 
         self.command_dict = {
             "ehelp": self.ehandle_help,
-            "start": self.handle_help,
+            "start": self.handle_start,
             "help": self.handle_help,
             "pyrogram": self.handle_pyrogram_version,
             "ytdlp": self.handle_ytdlp_version,
@@ -45,7 +45,7 @@ class CommandHandler:
             command = message.command[0]
 
             user_id = message.from_user.id if message.from_user else None
-            if not str(user_id) in self.env.AUTHORIZED_USER_ID and not command == 'id':
+            if not str(user_id) in self.env.AUTHORIZED_USER_ID and command not in ('id', 'start'):
                 return False
 
             logger.info(f"process_command:: {command}")
@@ -84,6 +84,32 @@ class CommandHandler:
             await client.send_message(message.chat.id, chunk)
         
         #await message.reply_text(help_text, parse_mode=enums.ParseMode.DISABLED)
+
+    async def handle_start(self, client: Client, message: Message):
+        first_name = message.from_user.first_name if message.from_user and message.from_user.first_name else "صديقي"
+        caption = (
+            f"أهلاً بك يا {first_name} في بوت التحميل! 🚀\n\n"
+            "يمكنك استخدام البوت لتحميل الملفات والوسائط بسهولة."
+        )
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("قناة الدعم ⚙️", url="https://t.me/shaheen_ys"),
+                InlineKeyboardButton("هدية يومية 🎁", url="https://t.me/fi1_oo"),
+            ],
+            [
+                InlineKeyboardButton("المطور", callback_data="developer_card"),
+            ],
+        ])
+        try:
+            await client.send_video(
+                chat_id=message.chat.id,
+                video="https://files.catbox.moe/ek7mkp.mp4",
+                caption=caption,
+                reply_markup=keyboard,
+            )
+        except Exception as e:
+            logger.error(f"handle_start send_video error: {e}")
+            await message.reply_text(caption, reply_markup=keyboard)
 
     async def handle_help(self, client: Client, message: Message):
 

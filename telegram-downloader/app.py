@@ -315,6 +315,26 @@ async def handle_text_messages(client, message: Message):
                 await url_downloader.download_from_url(client, message, url)  # Use the class method
 
 
+@app.on_callback_query(filters.regex(r'^developer_card$'))
+async def handle_developer_card(client: Client, callback_query: CallbackQuery):
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("𝐓𝐈𝐊 𝐓𝐎𝐊", url="https://www.tiktok.com/@zix8ii?_r=1&_d=f3c01a6371bii9&sec_uid=")],
+        [InlineKeyboardButton("𝐈𝐍𝐒𝐓𝐀𝐆𝐑𝐀𝐌", url="https://www.instagram.com/1.0_v_?igsh=N2N5MXNwN3p4ZDY2")],
+        [InlineKeyboardButton("𝐓𝐄𝑳𝐄𝐆𝐑𝐀𝐌", url="https://t.me/Y9_S4")],
+        [InlineKeyboardButton("𝗳𝗮𝗰𝗲𝗯𝗼𝗼𝗸", url="https://www.facebook.com/profile.php?id=61590749818315")],
+        [InlineKeyboardButton("𝐖𝐇𝐀𝐓𝐒𝐀𝐏𝐏", url="https://wa.link/lc6f5w")],
+    ])
+    try:
+        await callback_query.answer()
+        await client.send_photo(
+            chat_id=callback_query.message.chat.id,
+            photo="https://files.catbox.moe/szdu73.jpg",
+            reply_markup=keyboard,
+        )
+    except Exception as e:
+        logger.error(f"handle_developer_card error: {e}")
+
+
 @app.on_callback_query(filters.regex(r'^ytdown_.*'))
 async def handle_callback_query(client, callback_query: CallbackQuery):
     await url_downloader.handle_callback_query(client, callback_query)
