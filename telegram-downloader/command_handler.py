@@ -35,6 +35,7 @@ class CommandHandler:
             "addrenamegroup": self.addRenameGroup,
             "delrenamegroup": self.addRenameGroup,
             "broadcast": self.handle_broadcast,
+            "users": self.handle_users,
         }
 
         self.command_keys = list(self.command_dict.keys())
@@ -191,6 +192,64 @@ class CommandHandler:
             f"❌ فشل: **{failed}**\n"
             f"👥 الإجمالي: **{len(unique_ids)}**"
         )
+
+    async def handle_users(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        db = FileDataHandler()
+        downloads = db.downloads
+
+        if not downloads:
+            await message.reply_text("⚠️ لا يوجد مستخدمون في قاعدة البيانات بعد.")
+            return
+
+        # Aggregate per user: count of files and latest download date
+        user_stats = {}
+        for record in downloads:
+            uid = record.get("user_id")
+            if not uid:
+                continue
+            date_str = record.get("download_date", "")
+            if uid not in user_stats:
+                user_stats[uid] = {"count": 0, "last": date_str}
+            user_stats[uid]["count"] += 1
+            if date_str > user_stats[uid]["last"]:
+                user_stats[uid]["last"] = date_str
+
+        # Sort by most recent activity
+        sorted_users = sorted(user_stats.items(), key=lambda x: x[1]["last"], reverse=True)
+
+        total_users = len(sorted_users)
+        total_files = sum(v["count"] for v in user_stats.values())
+
+        # Build paginated text (Telegram limit: 4096 chars)
+        header = (
+            f"👥 **قائمة المستخدمين**\n"
+            f"إجمالي المستخدمين: **{total_users}** | إجمالي الملفات: **{total_files}**\n"
+            f"{'─' * 30}\n"
+        )
+        lines = []
+        for rank, (uid, info) in enumerate(sorted_users, 1):
+            last = info["last"][:16] if info["last"] else "—"
+            lines.append(f"{rank}. `{uid}` — 📁 {info['count']} ملف | 🕐 {last}")
+
+        # Send in chunks of 4096 chars
+        chunks = []
+        current = header
+        for line in lines:
+            if len(current) + len(line) + 1 > 4096:
+                chunks.append(current)
+                current = line + "\n"
+            else:
+                current += line + "\n"
+        if current:
+            chunks.append(current)
+
+        for chunk in chunks:
+            await client.send_message(message.chat.id, chunk)
 
     async def handle_help(self, client: Client, message: Message):
 
