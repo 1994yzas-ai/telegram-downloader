@@ -34,6 +34,7 @@ class CommandHandler:
             "delkeywordpath": self.delKeywordPath,
             "addrenamegroup": self.addRenameGroup,
             "delrenamegroup": self.addRenameGroup,
+            "broadcast": self.handle_broadcast,
         }
 
         self.command_keys = list(self.command_dict.keys())
@@ -129,6 +130,67 @@ class CommandHandler:
             await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
             return
         await _send_stats(client, message.chat.id)
+
+    async def handle_broadcast(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        # Determine what to broadcast
+        broadcast_text = None
+        reply_msg = message.reply_to_message
+
+        args = message.command[1:]
+        if args:
+            broadcast_text = " ".join(args)
+
+        if not broadcast_text and not reply_msg:
+            await message.reply_text(
+                "📢 **طريقة الاستخدام:**\n\n"
+                "• `/broadcast <نص الرسالة>` — بث نص مباشر\n"
+                "• قم بالرد على رسالة واكتب `/broadcast` — لإعادة إرسال تلك الرسالة"
+            )
+            return
+
+        # Collect unique user IDs from the download DB
+        db = FileDataHandler()
+        unique_ids = list({r["user_id"] for r in db.downloads if r.get("user_id")})
+
+        if not unique_ids:
+            await message.reply_text("⚠️ لا يوجد مستخدمون في قاعدة البيانات بعد.")
+            return
+
+        status_msg = await message.reply_text(
+            f"📤 جارٍ الإرسال إلى {len(unique_ids)} مستخدم..."
+        )
+
+        sent = 0
+        failed = 0
+        blocked = 0
+
+        for uid in unique_ids:
+            try:
+                if reply_msg:
+                    await reply_msg.forward(uid)
+                else:
+                    await client.send_message(uid, broadcast_text)
+                sent += 1
+            except Exception as e:
+                err = str(e).lower()
+                if "blocked" in err or "user is deactivated" in err or "forbidden" in err:
+                    blocked += 1
+                else:
+                    failed += 1
+                logger.warning(f"broadcast to {uid} failed: {e}")
+
+        await status_msg.edit_text(
+            f"✅ **اكتمل البث**\n\n"
+            f"📨 أُرسل بنجاح: **{sent}**\n"
+            f"🚫 محظور / غير نشط: **{blocked}**\n"
+            f"❌ فشل: **{failed}**\n"
+            f"👥 الإجمالي: **{len(unique_ids)}**"
+        )
 
     async def handle_help(self, client: Client, message: Message):
 
