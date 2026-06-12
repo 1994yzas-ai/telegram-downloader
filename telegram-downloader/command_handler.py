@@ -40,6 +40,7 @@ class CommandHandler:
             "ban": self.handle_ban,
             "unban": self.handle_unban,
             "banned": self.handle_banned_list,
+            "delete": self.handle_delete,
         }
 
         self.command_keys = list(self.command_dict.keys())
@@ -303,6 +304,60 @@ class CommandHandler:
 
         for chunk in chunks:
             await client.send_message(message.chat.id, chunk)
+
+    async def handle_delete(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+
+        if not message.reply_to_message:
+            await message.reply_text(
+                "📢 **طريقة الاستخدام:**\n\n"
+                "قم بالرد على رسالة الملف المحمّل واكتب `/delete`\n"
+                "سيقوم البوت بحذف الملف من القرص."
+            )
+            return
+
+        replied_id = message.reply_to_message.id
+        db = FileDataHandler()
+        file_path = db.get_download_file(replied_id)
+
+        if not file_path:
+            await message.reply_text(
+                f"⚠️ لم يُعثر على ملف مرتبط بهذه الرسالة في قاعدة البيانات.\n"
+                f"(معرّف الرسالة: `{replied_id}`)"
+            )
+            return
+
+        file_name = os.path.basename(file_path)
+
+        if not os.path.exists(file_path):
+            await message.reply_text(
+                f"⚠️ الملف غير موجود على القرص (ربما حُذف مسبقاً):\n`{file_path}`"
+            )
+            return
+
+        try:
+            file_size = os.path.getsize(file_path)
+            os.remove(file_path)
+            if file_size < 1024 ** 2:
+                size_str = f"{file_size / 1024:.2f} KB"
+            elif file_size < 1024 ** 3:
+                size_str = f"{file_size / 1024 ** 2:.2f} MB"
+            else:
+                size_str = f"{file_size / 1024 ** 3:.2f} GB"
+
+            logger.info(f"Deleted file: {file_path} by user {user_id}")
+            await message.reply_text(
+                f"🗑️ **تم حذف الملف بنجاح**\n\n"
+                f"📄 **الاسم:** `{file_name}`\n"
+                f"💾 **الحجم المُحرَّر:** {size_str}\n"
+                f"📂 **المسار:** `{file_path}`"
+            )
+        except Exception as e:
+            logger.error(f"handle_delete error: {e}")
+            await message.reply_text(f"❌ فشل حذف الملف:\n`{e}`")
 
     async def handle_users(self, client: Client, message: Message):
         user_id = message.from_user.id if message.from_user else None
