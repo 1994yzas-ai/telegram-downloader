@@ -5,3 +5,33 @@ stack = "BEST_EFFORT_FALLBACK"
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+CONFIG_PATH = "/home/runner/workspace/config"
+DOWNLOAD_PATH = "/home/runner/workspace/download"
+DOWNLOAD_PATH_TORRENTS = "/home/runner/workspace/watch"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd telegram-downloader && python app.py"
+
+[workflows.workflow.metadata]
+outputType = "console"

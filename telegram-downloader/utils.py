@@ -102,7 +102,10 @@ class Utils:
             os.remove("telegramBot.session")
 
     def change_permissions(self, path=None):
-        os.chown(self.env.DOWNLOAD_PATH, self.PUID, self.PGID)
+        try:
+            os.chown(self.env.DOWNLOAD_PATH, self.PUID, self.PGID)
+        except (PermissionError, OSError) as e:
+            logger.info(f"chown skipped (not root): {e}")
 
         if not path:
             return
@@ -116,8 +119,11 @@ class Utils:
                 logger.info(f"Permissions 777 assigned to the directory: {path}")
 
             if self.PUID and self.PGID:
-                os.chown(path, int(self.PUID), int(self.PGID))
-                logger.info(f"Owner changed to PUID:{self.PUID} and PGID:{self.PGID} for: {path}")
+                try:
+                    os.chown(path, int(self.PUID), int(self.PGID))
+                    logger.info(f"Owner changed to PUID:{self.PUID} and PGID:{self.PGID} for: {path}")
+                except (PermissionError, OSError) as e:
+                    logger.info(f"chown skipped (not root) for {path}: {e}")
             else:
                 logger.info("PUID or PGID are not defined. Owner not changed.")
         except Exception as e:
@@ -130,7 +136,10 @@ class Utils:
             if os.path.isfile(file_name): os.chmod(file_name, self.permissions_file)
             elif os.path.isdir(file_name): os.chmod(file_name, self.permissions_folder)
             else: os.chmod(file_name, self.permissions_file)
-            os.chown(file_name, self.PUID, self.PGID)
+            try:
+                os.chown(file_name, self.PUID, self.PGID)
+            except (PermissionError, OSError) as e:
+                logger.info(f"chown skipped (not root) for {file_name}: {e}")
             logger.info(f"[!] change_permissions_owner changed permissions and owner of {file_name}")
         except Exception as e:
             logger.info(f"Failed to change permissions and owner: {e}")

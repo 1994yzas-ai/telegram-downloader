@@ -69,7 +69,10 @@ while True:
             msg_txt += f"yt_dlp version: {yt_dlp.version.__version__}\n"
             
             logger.info(f"Telegram Downloader Bot Started : {datetime.now():%Y/%m/%d %H:%M:%S}")
-            app.send_message(int(env.AUTHORIZED_USER_ID[0]), msg_txt)
+            try:
+                app.send_message(int(env.AUTHORIZED_USER_ID[0]), msg_txt)
+            except RPCError as e:
+                logger.warning(f"Could not send startup message (peer not known yet): {e}")
             print_handler.print_variable("BOT_VERSION", config.BOT_VERSION)
             print_handler.print_variable("PYROGRAM_VERSION", pyrogram_version)
             print_handler.print_variable("YTDLP_VERSION", yt_dlp.version.__version__)
