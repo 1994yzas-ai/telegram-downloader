@@ -315,6 +315,89 @@ async def handle_text_messages(client, message: Message):
                 await url_downloader.download_from_url(client, message, url)  # Use the class method
 
 
+async def _send_stats(client: Client, chat_id: int):
+    """Build and send a stats message to the given chat_id."""
+    try:
+        db = utils.env  # reuse env for path
+        db_handler = FileDataHandler()
+        downloads = db_handler.downloads
+
+        total_files = len(downloads)
+
+        # Calculate total storage used by summing sizes of existing files
+        total_bytes = 0
+        for record in downloads:
+            fp = record.get("original_filename") or record.get("new_filename")
+            if fp and os.path.exists(fp):
+                try:
+                    total_bytes += os.path.getsize(fp)
+                except OSError:
+                    pass
+
+        if total_bytes < 1024:
+            storage_str = f"{total_bytes} B"
+        elif total_bytes < 1024 ** 2:
+            storage_str = f"{total_bytes / 1024:.2f} KB"
+        elif total_bytes < 1024 ** 3:
+            storage_str = f"{total_bytes / 1024 ** 2:.2f} MB"
+        else:
+            storage_str = f"{total_bytes / 1024 ** 3:.2f} GB"
+
+        # Last 5 recent downloads
+        recent = downloads[-5:][::-1]
+        recent_lines = ""
+        for i, r in enumerate(recent, 1):
+            fname = os.path.basename(r.get("original_filename") or r.get("new_filename") or "—")
+            date = r.get("download_date", "")[:16]
+            recent_lines += f"\n  {i}. `{fname}` — {date}"
+
+        text = (
+            "📊 **إحصائيات البوت**\n\n"
+            f"📁 **إجمالي الملفات المحمّلة:** {total_files}\n"
+            f"💾 **المساحة المستخدمة:** {storage_str}\n"
+            f"\n🕐 **آخر التنزيلات:**{recent_lines if recent_lines else chr(10) + '  لا توجد تنزيلات بعد.'}"
+        )
+        await client.send_message(chat_id, text)
+    except Exception as e:
+        logger.error(f"_send_stats error: {e}")
+        await client.send_message(chat_id, f"⚠️ تعذّر جلب الإحصائيات: {e}")
+
+
+@app.on_callback_query(filters.regex(r'^cmd_stats$'))
+async def handle_cb_stats(client: Client, callback_query: CallbackQuery):
+    await callback_query.answer()
+    user_id = callback_query.from_user.id if callback_query.from_user else None
+    if not str(user_id) in env.AUTHORIZED_USER_ID:
+        await callback_query.answer("⛔ هذا الخيار متاح للمسؤول فقط.", show_alert=True)
+        return
+    await _send_stats(client, callback_query.message.chat.id)
+
+
+@app.on_callback_query(filters.regex(r'^cmd_help$'))
+async def handle_cb_help(client: Client, callback_query: CallbackQuery):
+    from command_help import CommandHelp
+    await callback_query.answer()
+    await client.send_message(callback_query.message.chat.id, CommandHelp.get_help())
+
+
+@app.on_callback_query(filters.regex(r'^cmd_version$'))
+async def handle_cb_version(client: Client, callback_query: CallbackQuery):
+    await callback_query.answer()
+    await client.send_message(
+        callback_query.message.chat.id,
+        f"ℹ️ **إصدار البوت:** `{config.BOT_VERSION}`\n"
+        f"🔧 **Pyrogram:** `{config.PYROGRAM_VERSION}`\n"
+        f"📥 **yt-dlp:** `{config.YT_DLP_VERSION}`"
+    )
+
+
+@app.on_callback_query(filters.regex(r'^cmd_id$'))
+async def handle_cb_id(client: Client, callback_query: CallbackQuery):
+    await callback_query.answer()
+    user_id = callback_query.from_user.id if callback_query.from_user else "—"
+    await client.send_message(callback_query.message.chat.id, f"🆔 **معرّفك:** `{user_id}`")
+
+
 @app.on_callback_query(filters.regex(r'^developer_card$'))
 async def handle_developer_card(client: Client, callback_query: CallbackQuery):
     keyboard = InlineKeyboardMarkup([

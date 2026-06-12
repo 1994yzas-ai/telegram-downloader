@@ -37,6 +37,8 @@ class Env:
         self.DOWNLOAD_FILES_DB = os.environ.get("DOWNLOAD_FILES_DB", os.path.join(self.CONFIG_PATH, "download_files_db.json"))  # fmt: skip
         self.PENDING_FILES_DB = os.environ.get("PENDING_FILES_DB", os.path.join(self.CONFIG_PATH, "pending_messages.json"))  # fmt: skip
         
+        self.START_FROM_LATEST = os.getenv('START_FROM_LATEST', 'false').strip().lower() in ('true', '1')
+
         self.WELCOME="WELCOME"
 
 

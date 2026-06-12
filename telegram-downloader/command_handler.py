@@ -1,4 +1,5 @@
 
+import os
 from pyrogram import Client, filters, __version__ as pyrogram_version
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram import enums
@@ -6,6 +7,7 @@ from pyrogram import enums
 from env import Env
 from command_controller import CommandController
 from command_help import CommandHelp
+from data_handler import FileDataHandler
 from logger_config import logger
 
 class CommandHandler:
@@ -17,6 +19,7 @@ class CommandHandler:
             "ehelp": self.ehandle_help,
             "start": self.handle_start,
             "help": self.handle_help,
+            "stats": self.handle_stats,
             "pyrogram": self.handle_pyrogram_version,
             "ytdlp": self.handle_ytdlp_version,
             "version": self.handle_version,
@@ -89,7 +92,8 @@ class CommandHandler:
         first_name = message.from_user.first_name if message.from_user and message.from_user.first_name else "صديقي"
         caption = (
             f"أهلاً بك يا {first_name} في بوت التحميل! 🚀\n\n"
-            "يمكنك استخدام البوت لتحميل الملفات والوسائط بسهولة."
+            "يمكنك استخدام البوت لتحميل الملفات والوسائط بسهولة.\n\n"
+            "اختر أحد الخيارات أدناه:"
         )
         keyboard = InlineKeyboardMarkup([
             [
@@ -97,7 +101,15 @@ class CommandHandler:
                 InlineKeyboardButton("هدية يومية 🎁", url="https://t.me/fi1_oo"),
             ],
             [
-                InlineKeyboardButton("المطور", callback_data="developer_card"),
+                InlineKeyboardButton("📊 الإحصائيات", callback_data="cmd_stats"),
+                InlineKeyboardButton("❓ المساعدة", callback_data="cmd_help"),
+            ],
+            [
+                InlineKeyboardButton("ℹ️ الإصدار", callback_data="cmd_version"),
+                InlineKeyboardButton("🆔 معرّفي", callback_data="cmd_id"),
+            ],
+            [
+                InlineKeyboardButton("👨‍💻 المطور", callback_data="developer_card"),
             ],
         ])
         try:
@@ -110,6 +122,13 @@ class CommandHandler:
         except Exception as e:
             logger.error(f"handle_start send_video error: {e}")
             await message.reply_text(caption, reply_markup=keyboard)
+
+    async def handle_stats(self, client: Client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not str(user_id) in self.env.AUTHORIZED_USER_ID:
+            await message.reply_text("⛔ هذا الأمر متاح للمسؤول فقط.")
+            return
+        await _send_stats(client, message.chat.id)
 
     async def handle_help(self, client: Client, message: Message):
 
